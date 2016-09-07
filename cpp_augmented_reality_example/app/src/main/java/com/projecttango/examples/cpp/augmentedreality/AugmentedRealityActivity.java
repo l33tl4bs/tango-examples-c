@@ -27,6 +27,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.view.Display;
 import android.view.WindowManager;
+import android.content.Intent;
 
 import com.projecttango.examples.cpp.util.TangoInitializationHelper;
 
@@ -37,6 +38,32 @@ import com.projecttango.examples.cpp.util.TangoInitializationHelper;
 public class AugmentedRealityActivity extends Activity {
   // On current Tango devices, camera id 0 is the color camera.
   private static final int CAMERA_ID = 0;
+
+  public static final String USE_AREA_LEARNING =
+          "com.projecttango.examples.cpp.augmentedreality.usearealearning";
+  public static final String LOAD_ADF =
+          "com.projecttango.examples.cpp.augmentedreality.loadadf";
+
+  public static final String DATASET_RECORDING =
+          "com.projecttango.examples.cpp.augmentedreality.datasetrecording";
+
+
+  private static final String INTENT_CLASS_PACKAGE = "com.google.tango";
+  private static final String INTENT_DEPRECATED_CLASS_PACKAGE = "com.projecttango.tango";
+
+  // Key string for load/save Area Description Files.
+  private static final String AREA_LEARNING_PERMISSION =
+          "ADF_LOAD_SAVE_PERMISSION";
+
+  // Key string for Dataset Recording
+  private static final String DATASET_RECORDING_PERMISSION =
+          "DATASET_PERMISSION";
+
+  // Permission request action.
+  public static final int REQUEST_CODE_TANGO_PERMISSION = 0;
+  private static final String REQUEST_PERMISSION_ACTION =
+          "android.intent.action.REQUEST_TANGO_PERMISSION";
+
 
   // GLSurfaceView and its renderer, all of the graphic content is rendered
   // through OpenGL ES 2.0 in the native code.
@@ -61,9 +88,36 @@ public class AugmentedRealityActivity extends Activity {
       }
     };
 
+
+  // Call the permission intent for the Tango Service to ask for permissions.
+  // All permission types can be found here:
+  //   https://developers.google.com/project-tango/apis/c/c-user-permissions
+  private void getPermission(String permissionType) {
+    Intent intent = new Intent();
+    intent.setPackage(INTENT_CLASS_PACKAGE);
+    if (intent.resolveActivity(getApplicationContext().getPackageManager()) == null) {
+      intent = new Intent();
+      intent.setPackage(INTENT_DEPRECATED_CLASS_PACKAGE);
+    }
+    intent.setAction(REQUEST_PERMISSION_ACTION);
+    intent.putExtra("PERMISSIONTYPE", permissionType);
+
+    // After the permission activity is dismissed, we will receive a callback
+    // function onActivityResult() with user's result.
+    startActivityForResult(intent, REQUEST_CODE_TANGO_PERMISSION);
+  }
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
+
+    if (!Util.hasPermission(getApplicationContext(), AREA_LEARNING_PERMISSION)) {
+      getPermission(AREA_LEARNING_PERMISSION);
+    }
+
+    if (!Util.hasPermission(getApplicationContext(), DATASET_RECORDING_PERMISSION)) {
+      getPermission(DATASET_RECORDING_PERMISSION);
+    }
 
     WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
     Display display = windowManager.getDefaultDisplay();
@@ -93,6 +147,7 @@ public class AugmentedRealityActivity extends Activity {
     mRenderer = new AugmentedRealityRenderer(getAssets());
     mGLView.setRenderer(mRenderer);
   }
+
 
   @Override
   protected void onResume() {

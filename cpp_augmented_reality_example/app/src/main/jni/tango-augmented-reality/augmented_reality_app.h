@@ -72,6 +72,8 @@ class AugmentedRealityApp {
   // @param id: camera Id of the updated camera.
   void onTextureAvailable(TangoCameraId id);
 
+  void onPoseAvailable(const TangoPoseData* pose);
+
   // Allocate OpenGL resources for rendering, mainly initializing the Scene.
   void OnSurfaceCreated(AAssetManager* aasset_manager);
 

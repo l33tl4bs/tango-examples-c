@@ -77,6 +77,18 @@ void onTextureAvailableRouter(void* context, TangoCameraId id) {
       static_cast<tango_augmented_reality::AugmentedRealityApp*>(context);
   app->onTextureAvailable(id);
 }
+
+// This function routes onPoseAvailable callbacks to the application object for
+// handling.
+//
+// @param context, context will be a pointer to a AreaLearningApp
+//        instance on which to call callbacks.
+// @param pose, pose data to route to onPoseAvailable function.
+void onPoseAvailableRouter(void* context, const TangoPoseData* pose) {
+  tango_augmented_reality::AugmentedRealityApp* app =
+      static_cast<tango_augmented_reality::AugmentedRealityApp*>(context);
+  app->onPoseAvailable(pose);
+  }
 }  // namespace
 
 namespace tango_augmented_reality {
@@ -91,6 +103,20 @@ void AugmentedRealityApp::onTextureAvailable(TangoCameraId id) {
     RequestRender();
   }
 }
+
+void AugmentedRealityApp::onPoseAvailable(const TangoPoseData* pose) {
+  //std::lock_guard<std::mutex> lock(pose_mutex_);
+/*
+    if (pose->frame.base == TANGO_COORDINATE_FRAME_AREA_DESCRIPTION &&
+             pose->frame.target == TANGO_COORDINATE_FRAME_DEVICE) {
+        main_scene_.RotateEarthByPose(*pose);
+        main_scene_.RotateMoonByPose(*pose);
+        main_scene_.TranslateMoonByPose(*pose);
+    }
+    //LOGD("AugmentedRealityApp::onPoseAvailable: updated pose");
+    */
+}
+
 
 void AugmentedRealityApp::OnCreate(JNIEnv* env, jobject activity,
                                    int activity_orientation,
@@ -189,6 +215,7 @@ void AugmentedRealityApp::TangoSetupConfig() {
     std::exit(EXIT_SUCCESS);
   }
 
+/*
   // Drift correction allows motion tracking to recover after it loses tracking.
   //
   // The drift corrected pose is is available through the frame pair with
@@ -202,7 +229,78 @@ void AugmentedRealityApp::TangoSetupConfig() {
         ret);
     std::exit(EXIT_SUCCESS);
   }
+*/
+/*
+    ret = TangoConfig_setBool(tango_config_, "config_enable_learning_mode",
+                              true);
+    if (ret != TANGO_SUCCESS) {
+      LOGE(
+          "AugmentedRealityApp: enabling config_enable_learning_mode "
+          "failed with error code: %d",
+          ret);
+      std::exit(EXIT_SUCCESS);
+    }
+*/
+    ret = TangoConfig_setString(tango_config_, "config_load_area_description_UUID",
+                              "4fb33503-aa1e-4174-9469-c62d3378c27b");
+    if (ret != TANGO_SUCCESS) {
+      LOGE(
+          "AugmentedRealityApp: enabling config_load_area_description_UUID "
+          "failed with error code: %d",
+          ret);
+      std::exit(EXIT_SUCCESS);
+    }
 
+    ret = TangoConfig_setBool(tango_config_, "config_enable_debug_logging",
+                              false);
+    if (ret != TANGO_SUCCESS) {
+      LOGE(
+          "AugmentedRealityApp: enabling config_enable_debug_logging "
+          "failed with error code: %d",
+          ret);
+      std::exit(EXIT_SUCCESS);
+    }
+
+        // Setting up the frame pair for the onPoseAvailable callback.
+     TangoCoordinateFramePair pairs[3] = {
+         {TANGO_COORDINATE_FRAME_START_OF_SERVICE,
+          TANGO_COORDINATE_FRAME_DEVICE},
+         {TANGO_COORDINATE_FRAME_AREA_DESCRIPTION,
+          TANGO_COORDINATE_FRAME_DEVICE},
+         {TANGO_COORDINATE_FRAME_AREA_DESCRIPTION,
+          TANGO_COORDINATE_FRAME_START_OF_SERVICE}};
+
+        // Attach onPoseAvailable callback.
+        // The callback will be called after the service is connected.
+        ret = TangoService_connectOnPoseAvailable(3, pairs, onPoseAvailableRouter);
+        if (ret != TANGO_SUCCESS) {
+          LOGE(
+              "AreaLearningApp: Failed to connect to pose callback with error"
+              "code: %d",
+              ret);
+          std::exit(EXIT_SUCCESS);
+        }
+/*
+  ret = TangoConfig_setInt32(tango_config_, "config_dataset_recording_mode",
+                            2);
+  if (ret != TANGO_SUCCESS) {
+    LOGE(
+        "AugmentedRealityApp: enabling config_enable_dataset_recording "
+        "failed with error code: %d",
+        ret);
+    std::exit(EXIT_SUCCESS);
+  }
+
+  ret = TangoConfig_setBool(tango_config_, "config_enable_dataset_recording",
+                            true);
+  if (ret != TANGO_SUCCESS) {
+    LOGE(
+        "AugmentedRealityApp: enabling config_enable_dataset_recording "
+        "failed with error code: %d",
+        ret);
+    std::exit(EXIT_SUCCESS);
+  }
+*/
   // Get TangoCore version string from service.
   char tango_core_version[kVersionStringLength];
   ret = TangoConfig_getString(tango_config_, "tango_service_library_version",
@@ -380,12 +478,14 @@ void AugmentedRealityApp::OnDrawFrame() {
         CombineSensorRotation(activity_rotation_, sensor_rotation_);
 
     TangoDoubleMatrixTransformData matrix_transform;
+
     status = TangoSupport_getDoubleMatrixTransformAtTime(
         video_overlay_timestamp, TANGO_COORDINATE_FRAME_AREA_DESCRIPTION,
         TANGO_COORDINATE_FRAME_CAMERA_COLOR, TANGO_SUPPORT_ENGINE_OPENGL,
         TANGO_SUPPORT_ENGINE_OPENGL,
         static_cast<TangoSupportDisplayRotation>(combined_orientation),
         &matrix_transform);
+
     if (matrix_transform.status_code == TANGO_POSE_VALID) {
       {
         std::lock_guard<std::mutex> lock(transform_mutex_);
@@ -417,8 +517,8 @@ void AugmentedRealityApp::OnDrawFrame() {
       // to recover tracking.
       LOGE(
           "AugmentedRealityApp: Could not find a valid matrix transform at "
-          "time %lf for the color camera.",
-          video_overlay_timestamp);
+          "time %lf for the color camera; status %d",
+          video_overlay_timestamp, matrix_transform.status_code);
     }
   } else {
     LOGE(
